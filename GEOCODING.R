@@ -8,7 +8,7 @@
 
 library(ggmap)
 # Enter the API key here
-register_google(key = "AIzaSyAJaOkTHJcvjCvrUXbOQq4GmrBmqO4nq6I", write = TRUE)
+register_google(key = "AIzaSyAJaOkTHJcvjCvrUXbOQq4GmrBmqO4nq", write = TRUE)
 
 #read IOM_FMS data
 FMS_data <- readxl::read_xlsx('D:/OneDrive - CGIAR/SA_Team/korir/FCM/Somalia/New IOM Data/FMS_dataset_combined_clean_dept_and_transit.xlsx')
