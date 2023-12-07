@@ -1,5 +1,5 @@
 
-#* TODO: Script to Geocode village/town names and visualize
+#* TODO: Script to Geocode and visualize village/town names
 #* Requires: Google maps API
 #* Reference: https://guides.library.duke.edu/r-geospatial/geocode
 #* 
@@ -8,6 +8,7 @@
 
 library(ggmap)
 library(tidyverse)
+library(lubridate)
 # Enter the API key here
 register_google(key = "API KEY", write = TRUE)
 
@@ -20,18 +21,28 @@ FMS_data <- FMS_data[,c("Date of Survey","What is the main reason for your Journ
 names <- FMS_data$`City (Cleaned)`
 names <- names[-c(which(names=='Not Specified'))]
 names <- as.data.frame(names)
-library(tidygeocoder)
-df <- tidygeocoder::geocode(names, address = names, method = "osm")
-write.csv(df, file = 'D:/OneDrive - CGIAR/SA_Team/korir/tidygeo_villages.csv' )
+
 #Geocode village admin levels
 geo <- mutate_geocode(names, location = names, output = 'latlona')
 write.csv(geo, file = 'D:/OneDrive - CGIAR/SA_Team/korir/geo_villages.csv')
 
-Geocoded <- read.csv('D:/OneDrive - CGIAR/SA_Team/korir/geo_villages.csv')
+
+######### GEOCODING METHOD 2 #################################################
+library(tidygeocoder)
+df <- tidygeocoder::geocode(names, address = names, method = "osm")
+write.csv(df, file = 'D:/OneDrive - CGIAR/SA_Team/korir/tidygeo_villages.csv' )
+
+
+
+gg_Geocoded <- read.csv('D:/OneDrive - CGIAR/SA_Team/korir/geo_villages.csv')
+tidy_Geocoded <- read.csv('D:/OneDrive - CGIAR/SA_Team/korir/tidygeo_villages.csv')
+
+Geocoded <- gg_Geocoded %>% mutate(lon = coalesce(tidy_Geocoded$long)) %>%
+  mutate(lat = coalesce(tidy_Geocoded$lat))
 
 FMS_geo <- left_join(FMS_data, Geocoded, by=c("City (Cleaned)"='names'))
 FMS_geo <- FMS_geo[-c(which(is.na(FMS_geo$lat))),]
-library(lubridate)
+
 FMS_geo$`Date of Survey` <- lubridate::year(as.Date(FMS_geo$`Date of Survey`))
 
 Fgeo_2018 <- FMS_geo[which(FMS_geo$`Date of Survey`==2018),]
@@ -41,6 +52,11 @@ Fgeo_2021 <- FMS_geo[which(FMS_geo$`Date of Survey`==2021),]
 Fgeo_2022 <- FMS_geo[which(FMS_geo$`Date of Survey`==2022),]
 Fgeo_2023 <- FMS_geo[which(FMS_geo$`Date of Survey`==2023),]
 
+write.csv(Fgeo_2018, file = 'D:/OneDrive - CGIAR/SA_Team/korir/geo_2018.csv')
+write.csv(Fgeo_2019, file = 'D:/OneDrive - CGIAR/SA_Team/korir/geo_2019.csv')
+write.csv(Fgeo_2020, file = 'D:/OneDrive - CGIAR/SA_Team/korir/geo_2020.csv')
+write.csv(Fgeo_2021, file = 'D:/OneDrive - CGIAR/SA_Team/korir/geo_2021.csv')
+write.csv(Fgeo_2022, file = 'D:/OneDrive - CGIAR/SA_Team/korir/geo_2022.csv')
 write.csv(Fgeo_2023, file = 'D:/OneDrive - CGIAR/SA_Team/korir/geo_2023.csv')
 
 
