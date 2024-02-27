@@ -161,7 +161,7 @@ basepr <- terra::rast("D:/OneDrive - CGIAR/SA_Team/korir/LULC/pr_1991_2020.tif")
 futurepr <- terra::rast("D:/OneDrive - CGIAR/SA_Team/korir/LULC/pr_2024_2050.tif")%>% terra::mask(., AOI)
 
 temp_dif <- futuretemp-basetemp
-pr_dif <- futurepr-basetemp
+pr_dif <- futurepr-basepr
 
 
 #Plotting the changes per pixel, o - no change, 1- single change, 2 - double change
