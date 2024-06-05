@@ -1,4 +1,4 @@
-#* Land Use Land Cover change
+#* Land Use Land Cover change analysis to inform resource sharing agreement in Karamoja
 #* 
 #* 
 #* Author:: Victor Korir
@@ -37,14 +37,14 @@ CCI_2017 <- CCI_2017 %>% terra::crop(., st_bbox(AOI)) %>% terra::mask(., sf::st_
 CCI_2022 <- CCI_2022 %>% terra::crop(., st_bbox(AOI)) %>% terra::mask(., sf::st_as_sf(AOI))
 
 
-#Defining reclass matrix based on the following
-#*1-cropland, 2- irrigated cropland, 3-cropland/tree cover, 4-tree cover, 5- grassland,
-#*6-shrubland,7-Flooded shrub/herbaceous cover, 8- urban areas, 9- water, 10- bareland
+#Defining reclass matrix based on the IPCC classification guidelines
+#*1-cropland,  2-Forest, 3- grassland,
+#* 4- Settlements, 5- wetland, 6- others
 
 
-Reclass_mat <- matrix(c(10, 1, 11, 1, 20, 2, 30, 3, 40, 3, 60, 4, 61, 4, 50, 4, 
-                        62, 4,100, 4,110, 5, 122, 6, 120, 6, 130, 5, 150, 6, 151,
-                        6, 152,6, 153,6, 160,4,170,4, 180, 7, 190, 8, 200, 10,201, 10, 202, 10, 210, 9),
+Reclass_mat <- matrix(c(10, 1, 11, 1, 20, 1, 30, 1, 40, 1, 60, 2, 61, 2, 50, 2, 
+                        62, 2,100, 2,110, 3, 122, 3, 120, 3, 130, 3, 150, 3, 151,
+                       3, 152,3, 153,3, 160,2,170,2, 180, 5, 190, 4, 200, 6,201, 6, 202, 6, 210, 6),
                       ncol = 2,
                       byrow = TRUE)
 #Reclassifying
@@ -57,7 +57,38 @@ LULC2022_reclass <- terra::classify(CCI_2022, Reclass_mat)
 
 kara1_class <- c(LULC1995_reclass$lccs_class, LULC2004_reclass$lccs_class, LULC2013_reclass$lccs_class, 
                  LULC2022_reclass$lccs_class)
+##############################################################################
+# Function to process the raster stack
+process_raster_stack <- function(r_stack) {
+  # Initialize a list to store the results
+  results <- list()
+  
+  # Loop through pairs of consecutive rasters
+  for (i in 1:(nlyr(r_stack) - 1)) {
+    # Multiply the current raster by 10 and add the next raster
+    result <- r_stack[[i]] * 10 + r_stack[[i + 1]]
+    
+    # Mask out values to remain with values between 30 and 39
+    mask <- result >= 30 & result <= 39
+    result[!mask] <- NA
+    results[[i]] <- result
+  }
+  
+  # Return the list of results
+  return(results)
+}
 
+# Process the raster stack
+final_results <- process_raster_stack(kara1_class)
+
+# Optionally save and plot the results
+for (i in seq_along(final_results)) {
+  # Save each result if needed
+  # writeRaster(final_results[[i]], paste0("path_to_save_result_", i, ".tif"), format = "GTiff", overwrite = TRUE)
+  
+  # Plot each result
+  plot(final_results[[i]], main = paste("Result of raster", i, "and", i + 1))
+}
 ##############################################################################
 
 
@@ -74,9 +105,9 @@ cont_table <- OpenLand::contingencyTable(lcc_kara1_cl, 300)
 cont_table$tb_legend$categoryName <-as.character(cont_table$tb_legend$categoryName)
 
 #cont_table$tb_legend$categoryName[cont_table$tb_legend$categoryValue ==1 ,] <- 'Cropland'
-cont_table$tb_legend$color <- c("#33a02c", "#b2df8a", "#CAFF70", "#ff7f00",
-                                "#fdbf6f", "#fb9a99", "#436EEE",
-                                "#6a3d9a", "#1f78b4", "#e31a1c")
+cont_table$tb_legend$color <- c("#33a02c",  "#ff7f00",
+                                "#fdbf6f", "#fb9a99",
+                                "#1f78b4", "#e31a1c")
 
 #cont_table$tb_legend <- left_join(cont_table$tb_legend, labels, by= c('categoryValue' = 'V1'))
  
@@ -86,7 +117,7 @@ cont_table$tb_legend$color <- c("#33a02c", "#b2df8a", "#CAFF70", "#ff7f00",
 labels <- read.csv('D:/OneDrive - CGIAR/SA_Team/korir/LULC/karamoja_classes.csv', header = F)
 cont_table$tb_legend$categoryName <- labels$V2
 
-karaSL <- intensityAnalysis(dataset = cont_table, category_n ='Grassland' , category_m ='Bareland', area_km2 = T )
+karaSL <- intensityAnalysis(dataset = cont_table, category_n ='Grassland' , category_m ='Other', area_km2 = T )
 
 #Interval level plot
 interval<-plot(karaSL$interval_lvl,
@@ -176,12 +207,18 @@ acc_map <- tmap::tm_shape(testacc[[1]]) +
       paste0(testacc[[2]]$PxValue[4], " Changes", " (", round(testacc[[2]]$Percent[4], 2), "%", ")")
     ),
     palette = c("lightgrey", "#FFD700","#ff7f00",'darkred'),
-    title = "Changes in the interval \n1995 - 2022"
+    title = "LULC Changes \n1995 - 2022"
   ) +  tm_shape(AOI)+tm_borders(col = 'black', lwd = 0.5)+
   tm_shape(gha)+tm_borders(col = 'black', lwd = 2)+tm_text('COUNTRY', remove.overlap = F)+
   tm_shape(uga_setl)+tm_text('name', remove.overlap = T, print.tiny = T)+
   tm_shape(ken_setl)+tm_text('name', remove.overlap = T, print.tiny = T)+
-  tm_shape(Ken_high)+ tm_borders(col = "red")+
+  tm_shape(Ken_high)+ tm_borders(col = "red")+tm_add_legend(type = "symbol", 
+                                                            shape=22,
+                                                            size = 1.5,
+                                                            border.col = c("purple", "red"),
+                                                            col = NA,
+                                                            labels = c("Moderate Conflict", "High Conflict"),
+                                                            title = "Conflict Cluster") +
   tm_shape(Uga_high)+ tm_borders(col = "red")+
   tm_shape(Ken_moderate)+ tm_borders(col = "purple")+
   tm_shape(Uga_moderate)+ tm_borders(col = "purple")+
@@ -215,14 +252,14 @@ tmap_save(acc_map,'acc_map.png', device = png, dpi = 300)
 
 
 
-LULC_map <- tmap::tm_shape(LULC1995_reclass$lccs_class) +
+LULC_map <- tmap::tm_shape(LULC2022_reclass$lccs_class) +
   tmap::tm_raster(
     style = "cat",
     labels = as.character(labels$V2),
-    palette = c("#33a02c", "#b2df8a", "#CAFF70", "#ff7f00",
-                "#fdbf6f", "#fb9a99", "#436EEE",
-                "#6a3d9a", "#1f78b4", "#e31a1c"),
-    title = "LULC 1995"
+    palette = c("#7fc97f", "#6a3d9a", "#fdc086",
+                 "#ffff99", "#1f78b4",
+                  "#f0027f"),
+    title = "LULC 2022"
   ) + tm_shape(AOI)+tm_borders(col = 'black', lwd = 2)+
   tm_shape(gha)+tm_borders(col = 'black', lwd = 2)+tm_text('COUNTRY', remove.overlap = F)+
   tm_shape(uga_setl)+tm_text('name', remove.overlap = T, print.tiny = T)+
@@ -251,21 +288,69 @@ LULC_map <- tmap::tm_shape(LULC1995_reclass$lccs_class) +
     labels.rot = c(0, 90)
   ) +
   tmap::tm_layout(inner.margins = c(0.02, 0.02, 0.02, 0.02))
+tmap_save(LULC_map)
+#####################################################################
+#Grassland transitions
+
+
+
+LULC_map <- tmap::tm_shape(final_results[[2]]) +
+  tmap::tm_raster(
+    style = "cat",
+    #'Grassland-Wetland','Grassland-Settlements',
+    labels = c('Grassland-Cropland', 'Grassland-Forest', 'Grassland','Grassland-Settlements','Grassland-Others'),
+    palette = c("#d53e4f", "#fee08b", "green",'grey',
+                '#3288bd'),
+    title = "2004-2013"
+  ) + tm_shape(AOI)+tm_borders(col = 'black', lwd = 2)+
+  tm_shape(gha)+tm_borders(col = 'black', lwd = 2)+tm_text('COUNTRY', remove.overlap = F)+
+  tm_shape(uga_setl)+tm_text('name', remove.overlap = T, print.tiny = T)+
+  tm_shape(ken_setl)+tm_text('name', remove.overlap = T, print.tiny = T)+
+  
+  tmap::tm_legend(
+    position = c(0.01, 0.01),
+    legend.title.size = 1.2,
+    legend.title.fontface = "bold",
+    legend.text.size = 0.8
+  ) +
+  tmap::tm_compass(type = "arrow",
+                   position = c("right", "top"),
+                   size = 3) +
+  tmap::tm_scale_bar(
+    breaks = c(seq(0, 40, 10)),
+    position = c(0.76, 0.001),
+    text.size = 0.6
+  ) +
+  
+  tmap::tm_graticules(
+    n.x = 6,
+    n.y = 6,
+    lines = FALSE,
+    #alpha = 0.1
+    labels.rot = c(0, 90)
+  ) +
+  tmap::tm_layout(inner.margins = c(0.02, 0.02, 0.02, 0.02))
+tmap_save(LULC_map, '2004-2013.png', device = png, dpi = 300)
 
 #clim plots
-temp_map <- tmap::tm_shape(pr_dif) +
+temp_map <- tmap::tm_shape(temp_dif) +
   tmap::tm_raster(
-    style = "cont",
-    title = "Precipitation Variation(mm/day)"
+    style = "jenks",
+    title = "Temperature \nVariation (°C)"
   ) +  tm_shape(AOI)+tm_borders(col = 'black', lwd = 0.5)+
   tm_shape(gha)+tm_borders(col = 'black', lwd = 2)+tm_text('COUNTRY', remove.overlap = F)+
   tm_shape(uga_setl)+tm_text('name', remove.overlap = T, print.tiny = T)+
   tm_shape(ken_setl)+tm_text('name', remove.overlap = T, print.tiny = T)+
-  tm_shape(Ken_high)+ tm_borders(col = "red")+
-  tm_shape(Uga_high)+ tm_borders(col = "red")+
-  tm_shape(Ken_moderate)+ tm_borders(col = "purple")+
-  tm_shape(Uga_moderate)+ tm_borders(col = "purple")+
-  
+  tm_shape(Ken_high)+ tm_borders(col = "#2b83ba", lwd = 1.5)+tm_add_legend(type = "symbol", 
+                                                                shape=22,
+                                                                size = 1.5,
+                                                                border.col = c("purple", "#2b83ba"),
+                                                                col = NA,
+                                                                labels = c("Moderate Conflict", "High Conflict"),
+                                                                title = "Conflict Cluster") +
+  tm_shape(Uga_high)+ tm_borders(col = "#2b83ba", lwd = 1.5)+
+  tm_shape(Ken_moderate)+ tm_borders(col = "purple", lwd = 1.5)+
+  tm_shape(Uga_moderate)+ tm_borders(col = "purple", lwd = 1.5)+
   tmap::tm_legend(
     position = c(0.01, 0.02),
     legend.title.size = 1.2,
